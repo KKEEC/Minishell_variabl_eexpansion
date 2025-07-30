@@ -1,5 +1,6 @@
 #include "../../includes/executor.h"
 #include <unistd.h>
+#include <sys/wait.h>
 
 
 int is_builtin(const char *cmd)
@@ -112,33 +113,48 @@ static char **env_list_to_array(t_env *env)
 ////////
 static void execute_commands(t_ast *ast, t_env **env_list)
 {
-    (void)ast;
-    char *path = get_env_value(*env_list, "PATH");
-    int i = 0;
-    int j = 0;
-    char *str;
-    //int len = 0;
+    pid_t pid = fork();
 
-    while(path[i])
-    {
-        while (path[j])
-        {
-            if (path[j] == ':')
-            {
-                str = ft_strncpyandjoin(path, i, j,  ast->args[0]);
-                if (execve(str, ast->args, env_list_to_array(*env_list)) == -1)
-                {
-                    perror("execve failed");
-                }
-                printf("%s\n", str);
+    if (pid == -1) {
+        perror("fork failed");
+        return;
+    }
+
+    if (pid == 0) {
+        // Child process
+        char *path = get_env_value(*env_list, "PATH");
+        if (!path) {
+            fprintf(stderr, "PATH not found\n");
+            exit(127);
+        }
+
+        int i = 0, j = 0;
+        char *full_path;
+        while (path[j]) {
+            if (path[j] == ':' || path[j + 1] == '\0') {
+                if (path[j + 1] == '\0') j++; // Include last segment
+                full_path = ft_strncpyandjoin(path, i, j, ast->args[0]);
+
+                if (access(full_path, X_OK) == 0)
+                    execve(full_path, ast->args, env_list_to_array(*env_list));
+
+                free(full_path);
                 i = j + 1;
             }
             j++;
         }
-        i++;
-    }
 
+        // If we get here, command wasn't found
+        fprintf(stderr, "minishell: %s: command not found\n", ast->args[0]);
+        exit(127);
+    }
+    else {
+        // Parent process waits for child
+        int status;
+        waitpid(pid, &status, 0);
+    }
 }
+
 
 void execute_ast(t_ast *ast, t_env **env_list)
 {
