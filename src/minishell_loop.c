@@ -3,6 +3,14 @@
 #include "../includes/parser.h"
 #include "../includes/executor.h"
 
+static void execute_pipechaining(t_ast *ast, t_env **env_list)
+{
+    (void)ast;
+    (void)env_list;
+
+    printf("...executing pipe\n");
+}
+
 static t_ast *handle_input(t_env *env_list)
 {
     t_token *tokens;
@@ -41,8 +49,11 @@ void    minishell_loop(t_env *env_list)
             continue ;
         if(ast)
         {
-            print_ast(ast, 2);
-            execute_ast(ast, &env_list);
+            print_ast(ast, 3);
+            if (ast->type != NODE_PIPE && ast->type != NODE_REDIR)
+                execute_ast(ast, &env_list);
+            else
+                execute_pipechaining(ast, &env_list);
             free_ast(ast);
         }
     }
